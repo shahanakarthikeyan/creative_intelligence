@@ -1,0 +1,5 @@
+python-dotenv
+requests
+google-search-results
+pandas
+scikit-learn

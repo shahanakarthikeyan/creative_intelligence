@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCOUT // Competitive Creative Intelligence Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05070a;
+    --panel:#0a0f16;
+    --grid-line: rgba(0,255,242,0.06);
+    --cyan:#00fff2;
+    --cyan-dim:rgba(0,255,242,0.35);
+    --magenta:#ff2fd0;
+    --magenta-dim:rgba(255,47,208,0.35);
+    --amber:#ffb000;
+    --green:#39ff88;
+    --text:#c9dbe8;
+    --text-dim:#5c7284;
+    --mono: 'JetBrains Mono', monospace;
+    --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--body);
+    overflow-x:hidden;
+  }
+  body{
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 42px 42px;
+    min-height:100vh;
+    position:relative;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background: radial-gradient(ellipse at 50% -10%, rgba(0,255,242,0.08), transparent 60%);
+    pointer-events:none;
+    z-index:0;
+  }
+  /* scanline overlay */
+  body::after{
+    content:"";
+    position:fixed; inset:0;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 2px, transparent 3px);
+    pointer-events:none;
+    z-index:2;
+    opacity:0.5;
+  }
+
+  .wrap{ max-width:1080px; margin:0 auto; padding:40px 24px 80px; position:relative; z-index:1;}
+
+  header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:36px; flex-wrap:wrap; gap:16px;}
+  .brand-mark{ display:flex; align-items:center; gap:14px;}
+  .brand-mark .dot{
+    width:10px; height:10px; border-radius:50%; background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan), 0 0 18px var(--cyan);
+    animation: blink 1.6s infinite ease-in-out;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+  .brand-mark h1{
+    font-family:var(--mono); font-size:20px; letter-spacing:3px; margin:0;
+    color:var(--cyan); text-shadow:0 0 12px var(--cyan-dim);
+    font-weight:700;
+  }
+  .brand-mark span{ color:var(--text-dim); font-family:var(--mono); font-size:12px; letter-spacing:2px;}
+  .status{ font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:1px; text-align:right;}
+  .status b{color:var(--green);}
+
+  /* radar sweep signature element */
+  .radar{
+    width:64px; height:64px; border-radius:50%;
+    border:1px solid var(--cyan-dim);
+    position:relative; overflow:hidden;
+    background: radial-gradient(circle, rgba(0,255,242,0.04), transparent 70%);
+    flex-shrink:0;
+  }
+  .radar::before{
+    content:""; position:absolute; inset:0;
+    background: conic-gradient(from 0deg, transparent 0deg, var(--cyan) 18deg, transparent 40deg);
+    animation: spin 3.2s linear infinite;
+    opacity:.8;
+  }
+  .radar::after{
+    content:""; position:absolute; inset:8px; border-radius:50%; border:1px solid rgba(0,255,242,0.15);
+  }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+
+  /* command bar */
+  .command-bar{
+    background:var(--panel);
+    border:1px solid var(--cyan-dim);
+    border-radius:6px;
+    padding:18px 20px;
+    display:flex; gap:12px; align-items:center;
+    box-shadow: 0 0 0 1px rgba(0,255,242,0.03), 0 0 30px rgba(0,255,242,0.04);
+    margin-bottom:28px;
+    flex-wrap:wrap;
+  }
+  .command-bar .prompt{ font-family:var(--mono); color:var(--cyan); font-size:15px; white-space:nowrap;}
+  .command-bar input{
+    flex:1; min-width:200px;
+    background:transparent; border:none; outline:none;
+    font-family:var(--mono); font-size:15px; color:var(--text);
+    letter-spacing:0.5px;
+  }
+  .command-bar input::placeholder{ color:var(--text-dim); }
+  .run-btn{
+    font-family:var(--mono); font-size:12px; letter-spacing:2px; font-weight:700;
+    background:var(--cyan); color:#00201d; border:none; border-radius:4px;
+    padding:11px 20px; cursor:pointer; text-transform:uppercase;
+    transition: all .15s ease;
+    box-shadow:0 0 16px var(--cyan-dim);
+  }
+  .run-btn:hover{ box-shadow:0 0 24px var(--cyan); transform:translateY(-1px); }
+  .run-btn:disabled{ opacity:.4; cursor:not-allowed; box-shadow:none; }
+
+  /* agent selector */
+  .agents{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:28px;}
+  @media (max-width:760px){ .agents{grid-template-columns:repeat(2,1fr);} }
+  .agent-btn{
+    font-family:var(--mono); background:var(--panel); border:1px solid rgba(255,255,255,0.08);
+    color:var(--text-dim); border-radius:6px; padding:14px 10px; cursor:pointer;
+    text-align:left; position:relative; transition: all .18s ease;
+  }
+  .agent-btn .idx{ font-size:10px; letter-spacing:2px; opacity:.6; display:block; margin-bottom:6px;}
+  .agent-btn .name{ font-size:13px; font-weight:700; letter-spacing:1px; color:var(--text);}
+  .agent-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .agent-btn:not(:disabled):hover{ border-color:var(--cyan-dim); transform:translateY(-2px); }
+  .agent-btn.active{
+    border-color:var(--cyan); color:var(--cyan);
+    box-shadow:0 0 18px var(--cyan-dim), inset 0 0 12px rgba(0,255,242,0.06);
+  }
+  .agent-btn.active .name{ color:var(--cyan); text-shadow:0 0 8px var(--cyan-dim); }
+  .agent-btn.alert{ border-color:var(--amber); }
+  .agent-btn.alert .name{ color:var(--amber); }
+  .agent-btn .pulse{
+    position:absolute; top:10px; right:10px; width:7px; height:7px; border-radius:50%;
+    background:var(--amber); box-shadow:0 0 8px var(--amber);
+    animation:blink 1s infinite;
+  }
+
+  /* panel */
+  .panel{
+    background:var(--panel); border:1px solid rgba(255,255,255,0.08); border-radius:8px;
+    min-height:340px; padding:26px 28px;
+    position:relative;
+  }
+  .panel .tag{ font-family:var(--mono); font-size:11px; letter-spacing:3px; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px; display:block;}
+  .panel h2{ font-family:var(--mono); font-size:19px; color:var(--cyan); margin:0 0 18px; letter-spacing:1px;}
+  .empty{ color:var(--text-dim); font-family:var(--mono); font-size:13px; padding:60px 0; text-align:center; }
+  .empty .blink-cursor{ display:inline-block; width:8px; height:14px; background:var(--cyan); margin-left:4px; animation:blink 1s infinite; vertical-align:middle;}
+
+  /* cards used inside panels */
+  .card{
+    background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:6px;
+    padding:16px 18px; margin-bottom:12px;
+  }
+  .card .meta{ font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:1px; margin-bottom:8px; display:flex; gap:14px; flex-wrap:wrap;}
+  .card .meta b{ color:var(--cyan); }
+  .card .headline{ font-weight:600; color:var(--text); margin-bottom:4px; font-size:14.5px;}
+  .card .body{ color:var(--text-dim); font-size:13.5px; line-height:1.5;}
+  .chip{ display:inline-block; font-family:var(--mono); font-size:10.5px; letter-spacing:1px; padding:3px 9px; border-radius:20px; border:1px solid var(--magenta-dim); color:var(--magenta); margin-right:6px; text-transform:uppercase;}
+  .chip.green{ border-color:rgba(57,255,136,0.35); color:var(--green); }
+  .chip.amber{ border-color:rgba(255,176,0,0.4); color:var(--amber); }
+
+  /* product image gallery */
+  .image-gallery{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr));
+    gap:14px; margin-bottom:24px;
+  }
+  .image-card{
+    background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08);
+    border-radius:8px; overflow:hidden; transition:all .18s ease; cursor:pointer;
+    text-decoration:none; display:block;
+  }
+  .image-card:hover{ border-color:var(--cyan-dim); transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,255,242,0.08); }
+  .image-card .thumb{
+    width:100%; aspect-ratio:1/1; object-fit:cover; display:block;
+    background:rgba(255,255,255,0.03);
+  }
+  .image-card .thumb-fallback{
+    width:100%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,0.03); color:var(--text-dim); font-family:var(--mono); font-size:11px;
+  }
+  .image-card .caption{
+    padding:9px 10px; font-family:var(--mono); font-size:11px; color:var(--text-dim);
+    line-height:1.4; border-top:1px solid rgba(255,255,255,0.06);
+  }
+  .image-card .caption b{ color:var(--text); display:block; margin-bottom:2px; font-size:11.5px;}
+  .section-label{
+    font-family:var(--mono); font-size:12px; color:var(--text-dim); letter-spacing:2px;
+    text-transform:uppercase; margin:22px 0 12px; display:block;
+  }
+  .section-label:first-child{ margin-top:0; }
+
+  /* forms (Fatigue + Creative panels) */
+  .form-group{ margin-bottom:16px; }
+  .form-group label{
+    display:block; font-family:var(--mono); font-size:11.5px; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;
+  }
+  .form-group input, .form-group select, .form-group textarea{
+    width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12);
+    border-radius:6px; padding:10px 12px; color:var(--text); font-family:var(--mono);
+    font-size:13px; outline:none; transition:border-color .15s ease;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus{
+    border-color:var(--cyan-dim);
+  }
+  .form-group textarea{ resize:vertical; min-height:60px; }
+  .form-submit{
+    background:var(--cyan); color:#001018; border:none; border-radius:6px;
+    padding:11px 22px; font-family:var(--mono); font-weight:700; font-size:12.5px;
+    letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:opacity .15s ease;
+  }
+  .form-submit:hover{ opacity:0.85; }
+  .form-submit:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  /* top-5 rank cards */
+  .rank-card{
+    display:flex; gap:14px; padding:14px; margin-bottom:10px;
+    background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px;
+  }
+  .rank-badge{
+    flex-shrink:0; width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; font-size:14px;
+    background:rgba(0,255,242,0.08); border:1px solid var(--cyan-dim); color:var(--cyan);
+  }
+  .rank-card:nth-child(1) .rank-badge{ background:rgba(255,176,0,0.12); border-color:rgba(255,176,0,0.5); color:var(--amber); }
+  .rank-body .headline{ margin-bottom:4px; }
+  .rank-body .reason{ font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-top:4px; }
+  .rank-score{
+    flex-shrink:0; text-align:right; font-family:var(--mono); font-size:11px; color:var(--text-dim);
+  }
+  .rank-score b{ display:block; font-size:16px; color:var(--cyan); }
+
+  /* generated ad result card */
+  .ad-result{
+    border:1px solid var(--cyan-dim); border-radius:10px; padding:20px;
+    background:linear-gradient(135deg, rgba(0,255,242,0.04), rgba(255,0,229,0.03));
+    margin-top:18px;
+  }
+  .ad-result .headline{ font-size:18px; margin-bottom:8px; }
+  .ad-result .body{ font-size:13.5px; margin-bottom:14px; }
+  .ad-result .source-tag{
+    font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--text-dim); margin-top:12px; display:block;
+  }
+
+  .bar-row{ display:flex; align-items:center; gap:12px; margin-bottom:10px; font-family:var(--mono); font-size:12px;}
+  .bar-row .label{ width:130px; color:var(--text-dim); flex-shrink:0;}
+  .bar-track{ flex:1; height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;}
+  .bar-fill{ height:100%; background:linear-gradient(90deg, var(--cyan), var(--magenta)); border-radius:4px;}
+  .bar-val{ width:70px; text-align:right; color:var(--text);}
+
+  .alert-box{
+    border:1px solid rgba(255,176,0,0.4); background:rgba(255,176,0,0.05); border-radius:6px;
+    padding:16px 18px; margin-bottom:14px; font-family:var(--mono); font-size:13px; color:var(--amber);
+    display:flex; gap:10px; align-items:flex-start;
+  }
+  .footer-note{ margin-top:26px; font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:0.5px; line-height:1.7;}
+  .footer-note a{ color:var(--cyan); text-decoration:none;}
+
+  ::selection{ background:var(--cyan); color:#001a17; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand-mark">
+      <div class="radar"></div>
+      <div>
+        <h1>SCOUT<span style="color:var(--magenta)">::</span>CONSOLE</h1>
+        <span>competitive creative intelligence engine</span>
+      </div>
+    </div>
+    <div class="status">
+      SESSION <b id="session-id">STANDBY</b><br>
+      AGENTS ONLINE: 5/5
+    </div>
+  </header>
+
+  <div class="command-bar">
+    <span class="prompt">scout&gt;</span>
+    <input id="brand-input" type="text" placeholder="enter a brand name to run intelligence sweep..." />
+    <button class="run-btn" id="run-btn" onclick="runScout()">Run Scout</button>
+  </div>
+
+  <div class="agents" id="agent-buttons">
+    <button class="agent-btn active" data-agent="scout" onclick="selectAgent('scout')" disabled>
+      <span class="idx">01 // COLLECT</span><span class="name">SCOUT</span>
+    </button>
+    <button class="agent-btn" data-agent="analyst" onclick="selectAgent('analyst')" disabled>
+      <span class="idx">02 // EXTRACT</span><span class="name">ANALYST</span>
+    </button>
+    <button class="agent-btn" data-agent="strategist" onclick="selectAgent('strategist')" disabled>
+      <span class="idx">03 // RANK</span><span class="name">STRATEGIST</span>
+    </button>
+    <button class="agent-btn" data-agent="fatigue" onclick="selectAgent('fatigue')">
+      <span class="idx">04 // MONITOR</span><span class="name">FATIGUE</span>
+    </button>
+    <button class="agent-btn" data-agent="creative" onclick="selectAgent('creative')">
+      <span class="idx">05 // GENERATE</span><span class="name">CREATIVE</span>
+    </button>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="empty">NO ACTIVE SWEEP — enter a brand name above and run Scout to begin<span class="blink-cursor"></span></div>
+  </div>
+
+  <div class="footer-note">
+    // LIVE MODE — this console calls the real agents (agents/scout.py, analyst.py, strategist.py, fatigue_monitor.py, creative.py) via a local server.<br>
+    // run <b style="color:var(--text)">python server.py</b> and keep this page open at <b style="color:var(--text)">http://localhost:5000</b> for results to work.
+  </div>
+
+</div>
+
+<script>
+let STATE = { brand:null, ads:[], insights:{}, brief:null, topAds:[], fatigueResult:null, creativeResult:null };
+let ACTIVE_AGENT = 'scout';
+
+async function runScout(){
+  const brand = document.getElementById('brand-input').value.trim();
+  if(!brand){ document.getElementById('brand-input').focus(); return; }
+
+  const runBtn = document.getElementById('run-btn');
+  const panel = document.getElementById('panel');
+  runBtn.disabled = true;
+  runBtn.textContent = 'Running...';
+  document.getElementById('session-id').textContent = "RUNNING — " + brand.toUpperCase();
+  panel.innerHTML = '<div class="empty">Contacting live agents (SerpAPI, ScrapingBee, Facebook)...<span class="blink-cursor"></span></div>';
+
+  try{
+    const res = await fetch('/api/run', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({brand})
+    });
+
+    if(!res.ok){
+      const err = await res.json().catch(()=>({error:'Unknown server error'}));
+      throw new Error(err.error || `Server returned ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    STATE.brand = data.brand;
+    STATE.ads = data.ads || [];
+    STATE.insights = data.insights || {};
+    STATE.brief = data.brief || {winning_angles:[], gaps:[], clusters:{}};
+    STATE.topAds = data.top_ads || [];
+    STATE.linkedin = data.linkedin || null;
+
+    document.getElementById('session-id').textContent = "ACTIVE — " + brand.toUpperCase();
+    document.querySelectorAll('.agent-btn').forEach(b=>b.disabled=false);
+
+    selectAgent('scout');
+
+  } catch(e){
+    document.getElementById('session-id').textContent = "ERROR";
+    panel.innerHTML = `<div class="empty">⚠️ Could not reach the live pipeline: ${e.message}<br><br>Make sure <b style="color:var(--text)">python server.py</b> is running, and that you opened this page via <b style="color:var(--text)">http://localhost:5000</b> (not by double-clicking the file).</div>`;
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = 'Run Scout';
+  }
+}
+
+function selectAgent(agent){
+  ACTIVE_AGENT = agent;
+  document.querySelectorAll('.agent-btn').forEach(b=>b.classList.toggle('active', b.dataset.agent===agent));
+  render();
+}
+
+function render(){
+  const panel = document.getElementById('panel');
+  // Fatigue and Creative are standalone tools — they don't need a Scout sweep first
+  if(ACTIVE_AGENT==='fatigue') return renderFatigue(panel);
+  if(ACTIVE_AGENT==='creative') return renderCreative(panel);
+
+  if(!STATE.brand){
+    panel.innerHTML = '<div class="empty">NO ACTIVE SWEEP — enter a brand name above and run Scout to begin<span class="blink-cursor"></span></div>';
+    return;
+  }
+  if(ACTIVE_AGENT==='scout') return renderScout(panel);
+  if(ACTIVE_AGENT==='analyst') return renderAnalyst(panel);
+  if(ACTIVE_AGENT==='strategist') return renderStrategist(panel);
+}
+
+function renderScout(panel){
+  let html = `<span class="tag">01 // collect</span><h2>Scout — Competitor Ads for "${STATE.brand}"</h2>`;
+
+  const withImages = STATE.ads.filter(ad => ad.image_url);
+  const withoutImages = STATE.ads.filter(ad => !ad.image_url);
+
+  if(withImages.length){
+    html += `<span class="section-label">// real images found (${withImages.length})</span>`;
+    html += `<div class="image-gallery">`;
+    withImages.forEach(ad=>{
+      const linkOut = ad.body && ad.body.startsWith('Real image found at:')
+        ? ad.body.replace('Real image found at:','').trim()
+        : (ad.image_url || '#');
+      html += `<a class="image-card" href="${linkOut}" target="_blank" rel="noopener">
+        <img class="thumb" src="${ad.image_url}" alt="${escapeHtml(ad.headline)}"
+             onerror="this.outerHTML='<div class=&quot;thumb-fallback&quot;>image unavailable</div>'">
+        <div class="caption"><b>${escapeHtml(ad.competitor)}</b>${escapeHtml(truncate(ad.headline, 60))}</div>
+      </a>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div class="empty" style="padding:20px 0;">No real images found for this sweep — results below are text-only (organic listings, ad copy, etc).</div>`;
+  }
+
+  if(withoutImages.length){
+    html += `<span class="section-label">// text results (${withoutImages.length})</span>`;
+    withoutImages.forEach(ad=>{
+      html += `<div class="card">
+        <div class="meta"><b>${escapeHtml(ad.competitor)}</b><span>${escapeHtml(ad.format)}</span><span>${ad.days_running} days running</span></div>
+        <div class="headline">${escapeHtml(ad.headline)}</div>
+        <div class="body">${escapeHtml(ad.body)}</div>
+      </div>`;
+    });
+  }
+
+  panel.innerHTML = html;
+}
+
+function escapeHtml(str){
+  if(!str) return '';
+  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function truncate(str, n){
+  if(!str) return '';
+  return str.length > n ? str.slice(0,n) + '…' : str;
+}
+
+function renderAnalyst(panel){
+  let html = `<span class="tag">02 // extract</span><h2>Analyst — Structured Ad Intelligence</h2>`;
+
+  if(!STATE.ads.length){
+    panel.innerHTML = html + `<div class="empty" style="padding:20px 0;">No ads collected this sweep to analyze.</div>`;
+    return;
+  }
+
+  // --- aggregate analysis summary ---
+  const angleCounts = {}, ctaCounts = {};
+  let withOffer = 0;
+  STATE.ads.forEach(ad=>{
+    const ins = STATE.insights[ad.ad_id] || {};
+    const angle = ins.angle || 'general';
+    const cta = ins.cta || 'unknown';
+    angleCounts[angle] = (angleCounts[angle]||0) + 1;
+    ctaCounts[cta] = (ctaCounts[cta]||0) + 1;
+    if(ins.offer && ins.offer !== 'none' && ins.offer !== 'unknown') withOffer++;
+  });
+  const topAngle = Object.entries(angleCounts).sort((a,b)=>b[1]-a[1])[0];
+  const topCta = Object.entries(ctaCounts).sort((a,b)=>b[1]-a[1])[0];
+  const offerPct = Math.round((withOffer / STATE.ads.length) * 100);
+
+  html += `<span class="section-label">// analysis summary</span>`;
+  html += `<div class="card" style="margin-bottom:20px;">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px;">
+      <div><div class="rank-score" style="text-align:left;">ADS ANALYZED<b style="color:var(--cyan);">${STATE.ads.length}</b></div></div>
+      <div><div class="rank-score" style="text-align:left;">TOP ANGLE<b style="color:var(--magenta);">${escapeHtml(topAngle ? topAngle[0] : 'n/a')}</b></div></div>
+      <div><div class="rank-score" style="text-align:left;">MOST USED CTA<b style="color:var(--amber);">${escapeHtml(topCta ? topCta[0] : 'n/a')}</b></div></div>
+      <div><div class="rank-score" style="text-align:left;">ADS WITH AN OFFER<b style="color:var(--green);">${offerPct}%</b></div></div>
+    </div>
+  </div>`;
+
+  html += `<span class="section-label">// per-ad breakdown</span>`;
+  STATE.ads.forEach(ad=>{
+    const ins = STATE.insights[ad.ad_id] || {angle:'general', offer:'unknown', cta:'unknown'};
+    html += `<div class="card">
+      <div class="meta"><b>${escapeHtml(ad.competitor)}</b></div>
+      <div class="headline">${escapeHtml(ad.headline)}</div>
+      <div style="margin-top:8px;">
+        <span class="chip">${escapeHtml(ins.angle)}</span>
+        <span class="chip green">${escapeHtml(ins.offer)}</span>
+        <span class="chip amber">${escapeHtml(ins.cta)}</span>
+      </div>
+    </div>`;
+  });
+  panel.innerHTML = html;
+}
+
+function renderStrategist(panel){
+  let html = `<span class="tag">03 // rank</span><h2>Strategist — Top 5 Ads &amp; Winning Angles</h2>`;
+
+  html += `<span class="section-label">// top 5 ranked ads (with reasoning)</span>`;
+  if(STATE.topAds && STATE.topAds.length){
+    STATE.topAds.forEach(item=>{
+      html += `<div class="rank-card">
+        <div class="rank-badge">${item.rank}</div>
+        <div class="rank-body" style="flex:1;">
+          <div class="meta"><b>${escapeHtml(item.competitor)}</b><span>${escapeHtml(item.format)}</span></div>
+          <div class="headline">${escapeHtml(item.headline)}</div>
+          <div class="reason">${escapeHtml(item.reason)}</div>
+        </div>
+        <div class="rank-score">SCORE<b>${(item.score*100).toFixed(0)}</b></div>
+      </div>`;
+    });
+  } else {
+    html += `<div class="empty" style="padding:20px 0;">No ads to rank this sweep.</div>`;
+  }
+
+  html += `<span class="section-label">// winning angles (avg longevity)</span>`;
+  const maxDays = Math.max(...(STATE.brief.winning_angles||[]).map(w=>w.avg_days_running), 1);
+  if(STATE.brief.winning_angles && STATE.brief.winning_angles.length){
+    STATE.brief.winning_angles.forEach(w=>{
+      const pct = Math.round((w.avg_days_running/maxDays)*100);
+      html += `<div class="bar-row">
+        <div class="label">${escapeHtml(w.angle)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div class="bar-val">${w.avg_days_running}d</div>
+      </div>`;
+    });
+  } else {
+    html += `<div class="empty">No angle ran long enough to qualify as "winning" this sweep.</div>`;
+  }
+
+  html += `<span class="section-label">// messaging gaps</span>`;
+  if(STATE.brief.gaps && STATE.brief.gaps.length){
+    STATE.brief.gaps.forEach(g=> html += `<span class="chip" style="margin-bottom:8px;">${escapeHtml(g.angle)} — untried by you</span>`);
+  } else {
+    html += `<div class="empty" style="padding:20px 0;">No gaps — you're already covering every winning angle.</div>`;
+  }
+  panel.innerHTML = html;
+}
+
+function renderFatigue(panel){
+  let html = `<span class="tag">04 // monitor</span><h2>Fatigue Monitor — Check Your Own Ad Performance</h2>`;
+  html += `<div class="footer-note" style="margin-bottom:18px;">// checks YOUR brand's CTR history file. If fatigue is detected, a real email alert is sent automatically.</div>`;
+
+  html += `<div class="form-group">
+    <label>Your Brand Name</label>
+    <input type="text" id="own-brand-input" placeholder="e.g. YourBrand" value="${STATE.fatigueResult ? escapeHtml(STATE.fatigueResult.own_brand) : ''}"/>
+  </div>
+  <button class="form-submit" id="fatigue-submit-btn" onclick="runFatigueCheck()">Check CTR &amp; Alert If Needed</button>`;
+
+  html += `<div id="fatigue-result-area" style="margin-top:22px;">`;
+  if(STATE.fatigueResult){
+    const r = STATE.fatigueResult;
+    if(r.alerts.length){
+      html += `<span class="section-label">// result: CTR IS LOW</span>`;
+      r.alerts.forEach(a=>{
+        html += `<div class="alert-box">⚠️ ${escapeHtml(a.message)}</div>`;
+      });
+      if(r.email.sent){
+        html += `<div class="alert-box" style="border-color:rgba(57,255,136,0.4); background:rgba(57,255,136,0.05); color:var(--green);">✅ Alert email sent — ${escapeHtml(r.email.reason)}</div>`;
+      } else {
+        html += `<div class="alert-box" style="border-color:rgba(255,176,0,0.4); background:rgba(255,176,0,0.05); color:var(--amber);">⚠️ Email not sent — ${escapeHtml(r.email.reason)}</div>`;
+      }
+    } else {
+      html += `<div class="alert-box" style="border-color:rgba(57,255,136,0.4); background:rgba(57,255,136,0.05); color:var(--green);">✓ CTR IS HIGH / NORMAL — no fatigue detected. ${escapeHtml(r.email.reason)}</div>`;
+    }
+  }
+  html += `</div>`;
+
+  panel.innerHTML = html;
+}
+
+async function runFatigueCheck(){
+  const ownBrand = document.getElementById('own-brand-input').value.trim();
+  const btn = document.getElementById('fatigue-submit-btn');
+  const resultArea = document.getElementById('fatigue-result-area');
+
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  resultArea.innerHTML = `<div class="empty" style="padding:20px 0;">Reading CTR history and checking for fatigue...<span class="blink-cursor"></span></div>`;
+
+  try{
+    const res = await fetch('/api/fatigue', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({own_brand: ownBrand})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || `Server returned ${res.status}`);
+
+    STATE.fatigueResult = data;
+
+    const fatigueBtn = document.querySelector('.agent-btn[data-agent="fatigue"]');
+    fatigueBtn.classList.toggle('alert', data.alerts.length > 0);
+
+  } catch(e){
+    resultArea.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check CTR & Alert If Needed';
+    render();
+  }
+}
+
+function renderCreative(panel){
+  let html = `<span class="tag">05 // generate</span><h2>Creative — Generate a Professional Ad</h2>`;
+  html += `<div class="footer-note" style="margin-bottom:18px;">// tell the Creative agent about your product and it'll write a unique, ready-to-publish ad.</div>`;
+
+  html += `<div class="form-group">
+    <label>Product / Service *</label>
+    <input type="text" id="cf-product" placeholder="e.g. wireless noise-cancelling headphones" value="${STATE.creativeResult ? escapeHtml(STATE.creativeResult.inputs.product) : ''}"/>
+  </div>
+  <div class="form-group">
+    <label>Target Audience</label>
+    <input type="text" id="cf-audience" placeholder="e.g. remote workers, students, commuters"/>
+  </div>
+  <div class="form-group">
+    <label>Key Offer / USP</label>
+    <input type="text" id="cf-offer" placeholder="e.g. 20% off this week, 30-hour battery life"/>
+  </div>
+  <div class="form-group">
+    <label>Tone</label>
+    <select id="cf-tone">
+      <option value="professional">Professional</option>
+      <option value="bold">Bold</option>
+      <option value="friendly">Friendly</option>
+      <option value="playful">Playful</option>
+      <option value="luxury">Luxury</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Preferred CTA (optional)</label>
+    <input type="text" id="cf-cta" placeholder="e.g. Shop Now, Get Yours, Learn More"/>
+  </div>
+  <button class="form-submit" id="creative-submit-btn" onclick="submitCreativeForm()">Generate Professional Ad</button>`;
+
+  html += `<div id="creative-result-area">`;
+  if(STATE.creativeResult){
+    const ad = STATE.creativeResult.ad;
+    html += `<div class="ad-result">
+      ${ad.image_url ? `<img src="${ad.image_url}" alt="Generated ad image" style="width:100%; border-radius:8px; margin-bottom:16px; display:block; background:rgba(255,255,255,0.03);" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend','<div class=\\'empty\\' style=\\'padding:16px 0;\\'>image still generating or unavailable — try again</div>')">` : ''}
+      <div class="headline">${escapeHtml(ad.headline)}</div>
+      <div class="body">${escapeHtml(ad.body)}</div>
+      <span class="chip amber">${escapeHtml(ad.cta)}</span>
+      <span class="source-tag">${ad.source === 'groq' ? '✨ AI-generated via Groq (Llama)' : '📝 Generated from your inputs (template mode — add GROQ_API_KEY for full AI generation)'} ${ad.image_url ? '+ image via Pollinations.ai' : ''}</span>
+    </div>`;
+  }
+  html += `</div>`;
+
+  panel.innerHTML = html;
+}
+
+async function submitCreativeForm(){
+  const product = document.getElementById('cf-product').value.trim();
+  const audience = document.getElementById('cf-audience').value.trim();
+  const offer = document.getElementById('cf-offer').value.trim();
+  const tone = document.getElementById('cf-tone').value;
+  const ctaPref = document.getElementById('cf-cta').value.trim();
+
+  if(!product){
+    document.getElementById('cf-product').focus();
+    return;
+  }
+
+  const btn = document.getElementById('creative-submit-btn');
+  const resultArea = document.getElementById('creative-result-area');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  resultArea.innerHTML = `<div class="empty" style="padding:20px 0;">Writing your ad and generating a real image (this can take 10-20 seconds)...<span class="blink-cursor"></span></div>`;
+
+  try{
+    const res = await fetch('/api/creative', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        product, audience, offer, tone,
+        cta_preference: ctaPref
+      })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || `Server returned ${res.status}`);
+
+    STATE.creativeResult = data;
+
+  } catch(e){
+    resultArea.innerHTML = `<div class="empty">⚠️ ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Professional Ad';
+    render();
+  }
+}
+
+document.getElementById('brand-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') runScout();
+});
+</script>
+</body>
+</html>
